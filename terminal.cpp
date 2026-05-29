@@ -216,94 +216,29 @@ void Terminal::render(TextEditor &editor) {
   write(STDOUT_FILENO, ab.buff.c_str(), ab.buff.length());
 }
 
-// void Terminal::enableRawMode() {
-//   tcgetattr(STDIN_FILENO, &orig_termios);
-//   struct termios raw = orig_termios;
-//   raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
-//   raw.c_oflag &= ~(OPOST);
-//   raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
-//   tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
-// }
-
-// void Terminal::disableRawMode() {
-//   tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
-// }
-
 void Terminal::enableRawMode() {
-#ifdef _WIN32
-  hInput = GetStdHandle(STD_INPUT_HANDLE);
-  hOutput = GetStdHandle(STD_OUTPUT_HANDLE);
-
-  if (hInput == INVALID_HANDLE_VALUE || hOutput == INVALID_HANDLE_VALUE) {
-    die("GetStdHandle failed");
-  }
-
-  GetConsoleMode(hInput, &orig_consoleModeIn);
-  GetConsoleMode(hOutput, &orig_consoleModeOut);
-
-  // Set Windows raw input flags (disable line buffering, echo, and close
-  // signals)
-  DWORD rawIn = orig_consoleModeIn & ~(ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT |
-                                       ENABLE_PROCESSED_INPUT);
-  SetConsoleMode(hInput, rawIn);
-
-  // CRITICAL: Turn on ANSI/VT100 Escape sequences for Windows colors and layout
-  // handling
-  DWORD rawOut = orig_consoleModeOut | ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-  SetConsoleMode(hOutput, rawOut);
-#else
-  // Keep your exact existing Linux tcgetattr and raw mode bitwise operations
-  // here!
   tcgetattr(STDIN_FILENO, &orig_termios);
   struct termios raw = orig_termios;
   raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
   raw.c_oflag &= ~(OPOST);
   raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
   tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
-#endif
 }
 
 void Terminal::disableRawMode() {
-#ifdef _WIN32
-  SetConsoleMode(hInput, orig_consoleModeIn);
-  SetConsoleMode(hOutput, orig_consoleModeOut);
-#else
   tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
-#endif
 }
 
-// void Terminal::getWindowSize() {
-//   struct winsize ws;
-//   if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_row == 0) {
-//     // Fallback defaults if ioctl fails
-//     screenRows = 24;
-//     screenCols = 80;
-//   } else {
-//     screenRows = ws.ws_row;
-//     screenCols = ws.ws_col;
-//   }
-// }
-
 void Terminal::getWindowSize() {
-#ifdef _WIN32
-  CONSOLE_SCREEN_BUFFER_INFO csbi;
-  if (GetConsoleScreenBufferInfo(hOutput, &csbi)) {
-    screenCols = csbi.srWindow.Right - csbi.srWindow.Left + 1;
-    screenRows = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
-  } else {
-    screenCols = 80;
-    screenRows = 24; // Fallback
-  }
-#else
   struct winsize ws;
-  if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0) {
-    screenCols = 80;
+  if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_row == 0) {
+    // Fallback defaults if ioctl fails
     screenRows = 24;
+    screenCols = 80;
   } else {
-    screenCols = ws.ws_col;
     screenRows = ws.ws_row;
+    screenCols = ws.ws_col;
   }
-#endif
 }
 
 size_t Terminal::getScreenRows() { return screenRows; }

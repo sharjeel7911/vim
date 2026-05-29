@@ -1,13 +1,6 @@
 // May 09, 2026
 #pragma once
 
-#ifdef _WIN32
-#include <windows.h>
-#else
-#include <termios.h>
-#include <unistd.h>
-#endif
-
 #include <cctype> // for isdigit(), isalnum(), isspace()
 #include <cstddef>
 #include <cstring> // strlen, mmemcpy
@@ -21,6 +14,8 @@
 #include <stdlib.h>
 #include <string>
 #include <sys/ioctl.h>
+#include <termios.h>
+#include <unistd.h>
 
 using std::cin;
 using std::cout;

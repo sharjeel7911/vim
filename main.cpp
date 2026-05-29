@@ -51,14 +51,3 @@ int main(int argc, char *argv[]) {
 
   return 0;
 }
-
-// #include "editor.h"
-
-// int main(int argc, char *argv[]) {
-//   std::string targetFile = (argc > 1) ? argv[1] : "";
-
-//   TextEditor editor;
-//   editor.run(targetFile); // The main engine loop stays inside the class
-
-//   return 0;
-// }
