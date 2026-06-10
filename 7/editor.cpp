@@ -1,5 +1,4 @@
 #include "editor.h"
-#include <cstddef>
 
 TextEditor::TextEditor() {
   status.currMode = EditorMode::NORMAL;
@@ -11,12 +10,19 @@ TextEditor::TextEditor() {
   updateStatus(22);
 }
 
-EditorStatus &TextEditor::getStatus() { return status; }
-FileManager &TextEditor::getFileManager() { return fileManager; }
-GapBuffer &TextEditor::getBuffer() { return buffer; }
+EditorStatus& TextEditor::getStatus() { return status; }
+FileManager& TextEditor::getFileManager() { return fileManager; }
+GapBuffer& TextEditor::getBuffer() { return buffer; }
 
 void TextEditor::setupFileContext() {
   status.totalRows = buffer.getRowCount();
+  // Force reset cursor and offset to start of file
+  status.cursorRow = 1;
+  status.cursorCol = 1;
+  status.rowOffset = 0;
+  status.targetColumn = 0;
+  buffer.moveCursorToPos(0);
+
   if (fileManager.isFileOpen()) {
     status.statusMessage = "Loaded " + fileManager.getCurrentFileName();
   }
@@ -25,11 +31,25 @@ void TextEditor::setupFileContext() {
 bool TextEditor::getifEditorRunning() { return ifEditorRunning; }
 
 void TextEditor::scrollWindow(size_t terminalTextHeight) {
+  size_t totalRows = buffer.getRowCount();
+
+  // Scroll up instantly when cursor row goes above row offset
   if (status.cursorRow - 1 < status.rowOffset) {
     status.rowOffset = status.cursorRow - 1;
   }
+
+  // Scroll down smoothly when the cursor tries to push out of view frame
   if (status.cursorRow - 1 >= status.rowOffset + terminalTextHeight) {
     status.rowOffset = status.cursorRow - terminalTextHeight;
+  }
+
+  // Clamp window parameters seamlessly to the total line length limits
+  if (status.rowOffset + terminalTextHeight > totalRows) {
+    if (totalRows >= terminalTextHeight) {
+      status.rowOffset = totalRows - terminalTextHeight;
+    } else {
+      status.rowOffset = 0;
+    }
   }
 }
 
@@ -42,15 +62,15 @@ void TextEditor::handleInputFromKeyboard(InputKey k) {
   }
 
   switch (status.currMode) {
-  case EditorMode::NORMAL:
-    executeNormalCommand(k);
-    break;
-  case EditorMode::INSERT:
-    executeInsertCommand(k);
-    break;
-  case EditorMode::COMMAND:
-    handleCommandModeInput(k);
-    break;
+    case EditorMode::NORMAL:
+      executeNormalCommand(k);
+      break;
+    case EditorMode::INSERT:
+      executeInsertCommand(k);
+      break;
+    case EditorMode::COMMAND:
+      handleCommandModeInput(k);
+      break;
   }
 }
 
@@ -120,150 +140,129 @@ void TextEditor::executeNormalCommand(InputKey k) {
   // --- execute multi-key actions ---
   if (action != DoubleCharCmd::None) {
     switch (action) {
+      case DoubleCharCmd::DeleteRow: {
+        if (!buffer.isBufferEmpty()) {
+          // one group for the whole dd/Ndd command
+          UndoGroup::beginGroup();
 
-    case DoubleCharCmd::DeleteRow: {
-      if (!buffer.isBufferEmpty()) {
-        // CHANGED: one group for the whole dd/Ndd command
-        UndoGroup::beginGroup();
+          size_t currentLineNum = buffer.getCurrentRowIndex();
+          size_t rowsAvailable = (status.totalRows >= currentLineNum) ? (status.totalRows - currentLineNum + 1) : 0;
+          int actualDeleteCount = (count > static_cast<int>(rowsAvailable)) ? static_cast<int>(rowsAvailable) : count;
 
-        size_t currentLineNum = buffer.getCurrentRowIndex();
-        size_t rowsAvailable = (status.totalRows >= currentLineNum)
-                                   ? (status.totalRows - currentLineNum + 1)
-                                   : 0;
-        int actualDeleteCount = (count > static_cast<int>(rowsAvailable))
-                                    ? static_cast<int>(rowsAvailable)
-                                    : count;
+          size_t startRowIndex = currentLineNum - 1;
+          size_t blockStart = buffer.getRowStartIndex(startRowIndex);
+          size_t blockEnd = blockStart;
 
-        size_t startRowIndex = currentLineNum - 1;
-        size_t blockStart = buffer.getRowStartIndex(startRowIndex);
-        size_t blockEnd = blockStart;
+          bool includesPreviousNewline = false;
+          for (int i = 0; i < actualDeleteCount; ++i) {
+            size_t currRow = startRowIndex + i;
+            if (currRow >= buffer.getRowCount()) break;
+            blockEnd = buffer.getRowEndIndex(currRow);
+          }
 
-        bool includesPreviousNewline = false;
-        for (int i = 0; i < actualDeleteCount; ++i) {
-          size_t currRow = startRowIndex + i;
-          if (currRow >= buffer.getRowCount())
-            break;
-          blockEnd = buffer.getRowEndIndex(currRow);
-        }
+          string deletedBlockText = "";
+          if (startRowIndex + actualDeleteCount >= buffer.getRowCount() && startRowIndex > 0) {
+            includesPreviousNewline = true;
+            deletedBlockText = buffer.getTextInRange(blockStart - 1, blockEnd);
+          } else if (blockEnd < buffer.getTextLength() && buffer.getCharAt(blockEnd) == '\n') {
+            deletedBlockText = buffer.getTextInRange(blockStart, blockEnd + 1);
+          } else {
+            deletedBlockText = buffer.getTextInRange(blockStart, blockEnd);
+          }
 
-        string deletedBlockText = "";
-        if (startRowIndex + actualDeleteCount >= buffer.getRowCount() &&
-            startRowIndex > 0) {
-          includesPreviousNewline = true;
-          deletedBlockText = buffer.getTextInRange(blockStart - 1, blockEnd);
-        } else if (blockEnd < buffer.getTextLength() &&
-                   buffer.getCharAt(blockEnd) == '\n') {
-          deletedBlockText = buffer.getTextInRange(blockStart, blockEnd + 1);
-        } else {
-          deletedBlockText = buffer.getTextInRange(blockStart, blockEnd);
-        }
-
-        for (int i = 0; i < actualDeleteCount; ++i)
-          deleteRow();
-        fileManager.markAsModified();
-
-        size_t pushPos =
-            includesPreviousNewline ? (blockStart - 1) : blockStart;
-        undoStack.push(
-            UndoAction(EditType::INSERT_CHAR, pushPos, deletedBlockText));
-        redoStack.clear();
-      }
-      break;
-    }
-
-    case DoubleCharCmd::YankRow: {
-      string yanked = "";
-      size_t oldCursor = buffer.getCursorPosition();
-      for (int i = 0; i < count; ++i) {
-        yankRow();
-        yanked += yankBuffer;
-        buffer.moveCursorDown(
-            buffer.getColIndexFromPos(buffer.getCursorPosition()));
-      }
-      yankBuffer = yanked;
-      buffer.moveCursorToPos(oldCursor);
-      break;
-    }
-
-    case DoubleCharCmd::GoTowardsFileTop: {
-      if (count > 1)
-        buffer.moveCursorToSpecificRow(count - 1);
-      else
-        buffer.moveCursorToBufferStart();
-      status.targetColumn =
-          buffer.getColIndexFromPos(buffer.getCursorPosition());
-      break;
-    }
-
-    case DoubleCharCmd::IndentRight: {
-      if (!buffer.isBufferEmpty()) {
-        // CHANGED: one group for the whole N>> command so one u undoes all
-        // lines
-        UndoGroup::beginGroup();
-
-        size_t initialCursorPos = buffer.getCursorPosition();
-        size_t startingRowIndex = buffer.getCurrentRowIndex() - 1;
-        size_t totalLines = buffer.getRowCount();
-
-        int linesToIndent = count;
-        if (startingRowIndex + linesToIndent > totalLines)
-          linesToIndent = totalLines - startingRowIndex;
-
-        for (int i = 0; i < linesToIndent; ++i) {
-          size_t currentRow = startingRowIndex + i;
-          buffer.moveCursorToSpecificRow(currentRow);
-          size_t rowFirstIndex = buffer.getRowStartIndex(currentRow);
-
-          indentRow(true);
+          for (int i = 0; i < actualDeleteCount; ++i) deleteRow();
           fileManager.markAsModified();
 
-          // CHANGED: all pushed inside the same group — popGroup() will grab
-          // them all
-          undoStack.push(
-              UndoAction(EditType::DELETE_CHAR, rowFirstIndex, "    "));
+          size_t pushPos = includesPreviousNewline ? (blockStart - 1) : blockStart;
+          undoStack.push(UndoAction(EditType::INSERT_CHAR, pushPos, deletedBlockText));
+          redoStack.clear();
         }
-
-        redoStack.clear();
-        buffer.moveCursorToPos(initialCursorPos);
+        break;
       }
-      break;
-    }
 
-    case DoubleCharCmd::IndentLeft: {
-      if (!buffer.isBufferEmpty()) {
-        // CHANGED: one group for the whole N<< command
-        UndoGroup::beginGroup();
+      case DoubleCharCmd::YankRow: {
+        string yanked = "";
+        size_t oldCursor = buffer.getCursorPosition();
+        for (int i = 0; i < count; ++i) {
+          yankRow();
+          yanked += yankBuffer;
+          buffer.moveCursorDown(buffer.getColIndexFromPos(buffer.getCursorPosition()));
+        }
+        yankBuffer = yanked;
+        buffer.moveCursorToPos(oldCursor);
+        break;
+      }
 
-        size_t initialCursorPos = buffer.getCursorPosition();
-        size_t startingRowIndex = buffer.getCurrentRowIndex() - 1;
-        size_t totalLines = buffer.getRowCount();
+      case DoubleCharCmd::GoTowardsFileTop: {
+        if (count > 1)
+          buffer.moveCursorToSpecificRow(count - 1);
+        else
+          buffer.moveCursorToBufferStart();
+        status.targetColumn = buffer.getColIndexFromPos(buffer.getCursorPosition());
+        break;
+      }
 
-        int linesToUnindent = count;
-        if (startingRowIndex + linesToUnindent > totalLines)
-          linesToUnindent = totalLines - startingRowIndex;
+      case DoubleCharCmd::IndentRight: {
+        if (!buffer.isBufferEmpty()) {
+          UndoGroup::beginGroup();
 
-        for (int i = 0; i < linesToUnindent; ++i) {
-          size_t currentRow = startingRowIndex + i;
-          buffer.moveCursorToSpecificRow(currentRow);
-          size_t rowFirstIndex = buffer.getRowStartIndex(currentRow);
+          size_t initialCursorPos = buffer.getCursorPosition();
+          size_t startingRowIndex = buffer.getCurrentRowIndex() - 1;
+          size_t totalLines = buffer.getRowCount();
 
-          if (buffer.getTextInRange(rowFirstIndex, rowFirstIndex + 4) ==
-              "    ") {
-            indentRow(false);
+          int linesToIndent = count;
+          if (startingRowIndex + linesToIndent > totalLines) linesToIndent = totalLines - startingRowIndex;
+
+          for (int i = 0; i < linesToIndent; ++i) {
+            size_t currentRow = startingRowIndex + i;
+            buffer.moveCursorToSpecificRow(currentRow);
+            size_t rowFirstIndex = buffer.getRowStartIndex(currentRow);
+
+            indentRow(true);
             fileManager.markAsModified();
-            undoStack.push(
-                UndoAction(EditType::INSERT_CHAR, rowFirstIndex, "    "));
+
+            // CHANGED: all pushed inside the same group — popGroup() will grab
+            // them all
+            undoStack.push(UndoAction(EditType::DELETE_CHAR, rowFirstIndex, "    "));
           }
+
+          redoStack.clear();
+          buffer.moveCursorToPos(initialCursorPos);
         }
-
-        redoStack.clear();
-        buffer.moveCursorToPos(initialCursorPos);
+        break;
       }
-      break;
-    }
 
-    default:
-      break;
+      case DoubleCharCmd::IndentLeft: {
+        if (!buffer.isBufferEmpty()) {
+          UndoGroup::beginGroup();
+
+          size_t initialCursorPos = buffer.getCursorPosition();
+          size_t startingRowIndex = buffer.getCurrentRowIndex() - 1;
+          size_t totalLines = buffer.getRowCount();
+
+          int linesToUnindent = count;
+          if (startingRowIndex + linesToUnindent > totalLines) linesToUnindent = totalLines - startingRowIndex;
+
+          for (int i = 0; i < linesToUnindent; ++i) {
+            size_t currentRow = startingRowIndex + i;
+            buffer.moveCursorToSpecificRow(currentRow);
+            size_t rowFirstIndex = buffer.getRowStartIndex(currentRow);
+
+            if (buffer.getTextInRange(rowFirstIndex, rowFirstIndex + 4) == "    ") {
+              indentRow(false);
+              fileManager.markAsModified();
+              undoStack.push(UndoAction(EditType::INSERT_CHAR, rowFirstIndex, "    "));
+            }
+          }
+
+          redoStack.clear();
+          buffer.moveCursorToPos(initialCursorPos);
+        }
+        break;
+      }
+
+      default:
+        break;
     }
 
     dPressed = yPressed = gPressed = greaterPressed = lessPressed = false;
@@ -291,191 +290,182 @@ void TextEditor::executeNormalCommand(InputKey k) {
   // group so Nx (delete 5 chars) is still one u, but each individual x is its
   // own u. We beginGroup() once before the loop — the loop may push multiple
   // actions but they all land in the same group.
-  bool needsGroup =
-      (act == SingleCharCmd::DeleteCharAfterCursor ||
-       act == SingleCharCmd::DeleteToEndOfRow ||
-       act == SingleCharCmd::JoinRows || act == SingleCharCmd::PasteAfter ||
-       act == SingleCharCmd::PasteBefore ||
-       act == SingleCharCmd::YankToEndOfRow);
-  if (needsGroup)
-    UndoGroup::beginGroup(); // CHANGED: stamp once for the whole Nx run
+  bool needsGroup = (act == SingleCharCmd::DeleteCharAfterCursor || act == SingleCharCmd::DeleteToEndOfRow ||
+                     act == SingleCharCmd::JoinRows || act == SingleCharCmd::PasteAfter ||
+                     act == SingleCharCmd::PasteBefore || act == SingleCharCmd::YankToEndOfRow);
+  if (needsGroup) UndoGroup::beginGroup();
 
   for (int i = 0; i < count; ++i) {
     switch (act) {
-
-    case SingleCharCmd::EnterInsertMode: {
-      // CHANGED: new group so the insert session that follows gets its own undo
-      // slot
-      UndoGroup::beginGroup();
-      status.currMode = EditorMode::INSERT;
-      return;
-    }
-
-    case SingleCharCmd::EnterCommandMode: {
-      status.currMode = EditorMode::COMMAND;
-      status.lastCommand = "";
-      return;
-    }
-
-    case SingleCharCmd::MoveDown:
-      buffer.moveCursorDown(status.targetColumn);
-      break;
-    case SingleCharCmd::MoveUp:
-      buffer.moveCursorUp(status.targetColumn);
-      break;
-
-    case SingleCharCmd::MoveLeft: {
-      buffer.moveCursorLeft();
-      status.targetColumn =
-          buffer.getColIndexFromPos(buffer.getCursorPosition());
-      break;
-    }
-    case SingleCharCmd::MoveRight: {
-      buffer.moveCursorRight();
-      status.targetColumn =
-          buffer.getColIndexFromPos(buffer.getCursorPosition());
-      break;
-    }
-    case SingleCharCmd::MoveByWordForward: {
-      buffer.moveCursorByWord(true);
-      status.targetColumn =
-          buffer.getColIndexFromPos(buffer.getCursorPosition());
-      break;
-    }
-    case SingleCharCmd::MoveByWordBackward: {
-      buffer.moveCursorByWord(false);
-      status.targetColumn =
-          buffer.getColIndexFromPos(buffer.getCursorPosition());
-      break;
-    }
-    case SingleCharCmd::MoveToWordEnd: {
-      buffer.moveCursorToEndOfWord();
-      status.targetColumn =
-          buffer.getColIndexFromPos(buffer.getCursorPosition());
-      break;
-    }
-    case SingleCharCmd::MoveToRowEnd: {
-      buffer.moveCursorToRowEnd();
-      status.targetColumn =
-          buffer.getColIndexFromPos(buffer.getCursorPosition());
-      break;
-    }
-    case SingleCharCmd::GoTowardsFileBottom: {
-      if (count > 1) {
-        buffer.moveCursorToSpecificRow(count - 1);
-        i = count;
-      } else
-        buffer.moveCursorToBufferEnd();
-      status.targetColumn =
-          buffer.getColIndexFromPos(buffer.getCursorPosition());
-      break;
-    }
-
-    case SingleCharCmd::DeleteCharAfterCursor: {
-      if (buffer.getCursorPosition() < buffer.getTextLength()) {
-        size_t changePos = buffer.getCursorPosition();
-        char deletedChar = buffer.getCharAt(changePos);
-        buffer.deleteCharAfterCursor();
-        fileManager.markAsModified();
-        undoStack.push(UndoAction(EditType::INSERT_CHAR, changePos,
-                                  string(1, deletedChar)));
-        redoStack.clear();
-        status.targetColumn =
-            buffer.getColIndexFromPos(buffer.getCursorPosition());
+      case SingleCharCmd::EnterInsertMode: {
+        // CHANGED: new group so the insert session that follows gets its own
+        // undo slot
+        UndoGroup::beginGroup();
+        status.currMode = EditorMode::INSERT;
+        return;
       }
-      break;
-    }
 
-    case SingleCharCmd::DeleteToEndOfRow: {
-      if (!buffer.isBufferEmpty()) {
-        size_t cursorPos = buffer.getCursorPosition();
-        size_t rowEnd = buffer.getRowEndIndex(buffer.getCurrentRowIndex() - 1);
-        if (rowEnd > cursorPos) {
-          string deletedText = buffer.getTextInRange(cursorPos, rowEnd);
-          deleteToEndOfRow();
-          fileManager.markAsModified();
-          undoStack.push(
-              UndoAction(EditType::INSERT_CHAR, cursorPos, deletedText));
-          redoStack.clear();
-          status.targetColumn =
-              buffer.getColIndexFromPos(buffer.getCursorPosition());
-        }
+      case SingleCharCmd::EnterCommandMode: {
+        status.currMode = EditorMode::COMMAND;
+        status.lastCommand = "";
+        return;
       }
-      break;
-    }
 
-    case SingleCharCmd::JoinRows: {
-      size_t rowIndex = buffer.getCurrentRowIndex() - 1;
-      if (rowIndex < buffer.getRowCount() - 1) {
+      // CHANGED: Handle / (search forward only)
+      case SingleCharCmd::SearchFile: {
+        status.currMode = EditorMode::COMMAND;
+        status.lastCommand = "/";
+        return;
+      }
+
+      case SingleCharCmd::MoveDown:
+        buffer.moveCursorDown(status.targetColumn);
+        break;
+      case SingleCharCmd::MoveUp:
+        buffer.moveCursorUp(status.targetColumn);
+        break;
+
+      case SingleCharCmd::MoveLeft: {
+        buffer.moveCursorLeft();
+        status.targetColumn = buffer.getColIndexFromPos(buffer.getCursorPosition());
+        break;
+      }
+      case SingleCharCmd::MoveRight: {
+        buffer.moveCursorRight();
+        status.targetColumn = buffer.getColIndexFromPos(buffer.getCursorPosition());
+        break;
+      }
+      case SingleCharCmd::MoveByWordForward: {
+        buffer.moveCursorByWord(true);
+        status.targetColumn = buffer.getColIndexFromPos(buffer.getCursorPosition());
+        break;
+      }
+      case SingleCharCmd::MoveByWordBackward: {
+        buffer.moveCursorByWord(false);
+        status.targetColumn = buffer.getColIndexFromPos(buffer.getCursorPosition());
+        break;
+      }
+      case SingleCharCmd::MoveToWordEnd: {
+        buffer.moveCursorToEndOfWord();
+        status.targetColumn = buffer.getColIndexFromPos(buffer.getCursorPosition());
+        break;
+      }
+      case SingleCharCmd::MoveToRowEnd: {
         buffer.moveCursorToRowEnd();
-        size_t joinPos = buffer.getCursorPosition();
-        joinCurrentRow();
-        fileManager.markAsModified();
-        undoStack.push(UndoAction(EditType::BACKSPACE_LN, joinPos, "\n"));
-        redoStack.clear();
-        status.targetColumn =
-            buffer.getColIndexFromPos(buffer.getCursorPosition());
+        status.targetColumn = buffer.getColIndexFromPos(buffer.getCursorPosition());
+        break;
       }
-      break;
-    }
+      case SingleCharCmd::GoTowardsFileBottom: {
+        if (count > 1) {
+          buffer.moveCursorToSpecificRow(count - 1);
+          i = count;
+        } else
+          buffer.moveCursorToBufferEnd();
+        status.targetColumn = buffer.getColIndexFromPos(buffer.getCursorPosition());
+        break;
+      }
 
-    case SingleCharCmd::PasteAfter: {
-      if (!yankBuffer.empty()) {
-        size_t rowEnd = buffer.getRowEndIndex(buffer.getCurrentRowIndex() - 1);
-        size_t pastePos = rowEnd + 1;
-        bool addedNewline = (rowEnd == buffer.getTextLength());
-
-        pasteStr(true);
-        fileManager.markAsModified();
-
-        if (addedNewline) {
-          undoStack.push(
-              UndoAction(EditType::DELETE_CHAR, rowEnd, "\n" + yankBuffer));
-        } else {
-          string pasteCheck = yankBuffer;
-          if (!pasteCheck.empty() && pasteCheck.back() == '\n')
-            pasteCheck.pop_back();
-          undoStack.push(
-              UndoAction(EditType::DELETE_CHAR, pastePos, pasteCheck));
+      case SingleCharCmd::DeleteCharAfterCursor: {
+        if (buffer.getCursorPosition() < buffer.getTextLength()) {
+          size_t changePos = buffer.getCursorPosition();
+          char deletedChar = buffer.getCharAt(changePos);
+          buffer.deleteCharAfterCursor();
+          fileManager.markAsModified();
+          undoStack.push(UndoAction(EditType::INSERT_CHAR, changePos, string(1, deletedChar)));
+          redoStack.clear();
+          status.targetColumn = buffer.getColIndexFromPos(buffer.getCursorPosition());
         }
-        redoStack.clear();
-        status.targetColumn =
-            buffer.getColIndexFromPos(buffer.getCursorPosition());
+        break;
       }
-      break;
-    }
 
-    case SingleCharCmd::PasteBefore: {
-      if (!yankBuffer.empty()) {
-        size_t rowStart =
-            buffer.getRowStartIndex(buffer.getCurrentRowIndex() - 1);
-        pasteStr(false);
-        fileManager.markAsModified();
-        undoStack.push(UndoAction(EditType::DELETE_CHAR, rowStart, yankBuffer));
-        redoStack.clear();
-        status.targetColumn =
-            buffer.getColIndexFromPos(buffer.getCursorPosition());
+      case SingleCharCmd::DeleteToEndOfRow: {
+        if (!buffer.isBufferEmpty()) {
+          size_t cursorPos = buffer.getCursorPosition();
+          size_t rowEnd = buffer.getRowEndIndex(buffer.getCurrentRowIndex() - 1);
+          if (rowEnd > cursorPos) {
+            string deletedText = buffer.getTextInRange(cursorPos, rowEnd);
+            deleteToEndOfRow();
+            fileManager.markAsModified();
+            undoStack.push(UndoAction(EditType::INSERT_CHAR, cursorPos, deletedText));
+            redoStack.clear();
+            status.targetColumn = buffer.getColIndexFromPos(buffer.getCursorPosition());
+          }
+        }
+        break;
       }
-      break;
-    }
 
-    case SingleCharCmd::YankToEndOfRow: {
-      yankToEndOfRow();
-      break;
-    }
+      case SingleCharCmd::JoinRows: {
+        size_t rowIndex = buffer.getCurrentRowIndex() - 1;
+        if (rowIndex < buffer.getRowCount() - 1) {
+          buffer.moveCursorToRowEnd();
+          size_t joinPos = buffer.getCursorPosition();
+          joinCurrentRow();
+          fileManager.markAsModified();
+          undoStack.push(UndoAction(EditType::BACKSPACE_LN, joinPos, "\n"));
+          redoStack.clear();
+          status.targetColumn = buffer.getColIndexFromPos(buffer.getCursorPosition());
+        }
+        break;
+      }
 
-    case SingleCharCmd::Undo: {
-      undo();
-      return;
-    }
+      case SingleCharCmd::PasteAfter: {
+        if (!yankBuffer.empty()) {
+          size_t rowEnd = buffer.getRowEndIndex(buffer.getCurrentRowIndex() - 1);
+          size_t pastePos = rowEnd + 1;
+          bool addedNewline = (rowEnd == buffer.getTextLength());
 
-    case SingleCharCmd::Redo: {
-      redo();
-      return;
-    }
+          pasteStr(true);
+          fileManager.markAsModified();
 
-    default:
-      break;
+          if (addedNewline) {
+            undoStack.push(UndoAction(EditType::DELETE_CHAR, rowEnd, "\n" + yankBuffer));
+          } else {
+            string pasteCheck = yankBuffer;
+            if (!pasteCheck.empty() && pasteCheck.back() == '\n') pasteCheck.pop_back();
+            undoStack.push(UndoAction(EditType::DELETE_CHAR, pastePos, pasteCheck));
+          }
+          redoStack.clear();
+          status.targetColumn = buffer.getColIndexFromPos(buffer.getCursorPosition());
+        }
+        break;
+      }
+
+      case SingleCharCmd::PasteBefore: {
+        if (!yankBuffer.empty()) {
+          size_t rowStart = buffer.getRowStartIndex(buffer.getCurrentRowIndex() - 1);
+          pasteStr(false);
+          fileManager.markAsModified();
+          undoStack.push(UndoAction(EditType::DELETE_CHAR, rowStart, yankBuffer));
+          redoStack.clear();
+          status.targetColumn = buffer.getColIndexFromPos(buffer.getCursorPosition());
+        }
+        break;
+      }
+
+      case SingleCharCmd::YankToEndOfRow: {
+        yankToEndOfRow();
+        break;
+      }
+
+      case SingleCharCmd::Undo: {
+        undo();
+        return;
+      }
+
+      case SingleCharCmd::Redo: {
+        redo();
+        return;
+      }
+
+      case SingleCharCmd::NextMatch:  // Find Next
+        searchEngine.findNext(buffer, status.cursorRow, status.statusMessage);
+        break;
+      case SingleCharCmd::PrevMatch:  // Find Previous
+        searchEngine.findPrev(buffer, status.cursorRow, status.statusMessage);
+        break;
+
+      default:
+        break;
     }
   }
 }
@@ -492,11 +482,10 @@ void TextEditor::executeInsertCommand(InputKey k) {
     // group too.
     UndoGroup::beginGroup();
     undoStack.push(UndoAction(EditType::ENTER_LN, changePos, "\n"));
-    UndoGroup::beginGroup(); // next keystrokes start fresh
+    UndoGroup::beginGroup();  // next keystrokes start fresh
     redoStack.clear();
     updateStatus(22);
     return;
-
   } else if (k == InputKey::BACKSPACE) {
     size_t changePos = buffer.getCursorPosition();
     if (changePos > 0) {
@@ -510,17 +499,14 @@ void TextEditor::executeInsertCommand(InputKey k) {
       if (deletedChar == '\n') {
         undoStack.push(UndoAction(EditType::BACKSPACE_LN, changePos - 1, "\n"));
       } else {
-        undoStack.push(UndoAction(EditType::INSERT_CHAR, changePos - 1,
-                                  string(1, deletedChar)));
+        undoStack.push(UndoAction(EditType::INSERT_CHAR, changePos - 1, string(1, deletedChar)));
       }
-      UndoGroup::beginGroup(); // next keystrokes start fresh
+      UndoGroup::beginGroup();  // next keystrokes start fresh
       redoStack.clear();
-      status.targetColumn =
-          buffer.getColIndexFromPos(buffer.getCursorPosition());
+      status.targetColumn = buffer.getColIndexFromPos(buffer.getCursorPosition());
     }
     updateStatus(22);
     return;
-
   } else if (k == InputKey::DELETE_KEY) {
     size_t changePos = buffer.getCursorPosition();
     if (changePos < buffer.getTextLength()) {
@@ -533,17 +519,14 @@ void TextEditor::executeInsertCommand(InputKey k) {
       if (deletedChar == '\n') {
         undoStack.push(UndoAction(EditType::BACKSPACE_LN, changePos, "\n"));
       } else {
-        undoStack.push(UndoAction(EditType::INSERT_CHAR, changePos,
-                                  string(1, deletedChar)));
+        undoStack.push(UndoAction(EditType::INSERT_CHAR, changePos, string(1, deletedChar)));
       }
-      UndoGroup::beginGroup(); // next keystrokes start fresh
+      UndoGroup::beginGroup();  // next keystrokes start fresh
       redoStack.clear();
-      status.targetColumn =
-          buffer.getColIndexFromPos(buffer.getCursorPosition());
+      status.targetColumn = buffer.getColIndexFromPos(buffer.getCursorPosition());
     }
     updateStatus(22);
     return;
-
   } else if (k == InputKey::TAB) {
     size_t changePos = buffer.getCursorPosition();
     buffer.insertStringAtCursor("    ");
@@ -585,16 +568,14 @@ void TextEditor::executeInsertCommand(InputKey k) {
     status.targetColumn = buffer.getColIndexFromPos(buffer.getCursorPosition());
 
     // Chunking: merge consecutive typed chars into one undo action
-    UndoAction *topAction = undoStack.peek();
+    UndoAction* topAction = undoStack.peek();
 
     if (topAction && topAction->type == EditType::DELETE_CHAR &&
-        topAction->groupId ==
-            UndoGroup::get() && // CHANGED: only merge within same group
+        topAction->groupId == UndoGroup::get() &&  // CHANGED: only merge within same group
         changePos == topAction->position + topAction->text.length()) {
       topAction->text += rawChar;
     } else {
-      undoStack.push(
-          UndoAction(EditType::DELETE_CHAR, changePos, string(1, rawChar)));
+      undoStack.push(UndoAction(EditType::DELETE_CHAR, changePos, string(1, rawChar)));
     }
     redoStack.clear();
     updateStatus(22);
@@ -621,10 +602,18 @@ void TextEditor::handleCommandModeInput(InputKey k) {
   }
 }
 
-void TextEditor::executeCommandMode(const string &rawCmd) {
+void TextEditor::executeCommandMode(const string& rawCmd) {
   string cmd = rawCmd;
-  if (!cmd.empty() && cmd[0] == ':')
+  if (!cmd.empty() && cmd[0] == '/') {
+    string pattern = cmd.substr(1);  // Extract pattern after '/'
+    performSearch(pattern, true);    // Forward search
+    status.currMode = EditorMode::NORMAL;
+    return;
+  }
+
+  if (!cmd.empty() && cmd[0] == ':') {
     cmd = cmd.substr(1);
+  }
 
   if (cmd.empty()) {
     status.currMode = EditorMode::NORMAL;
@@ -687,16 +676,15 @@ void TextEditor::executeCommandMode(const string &rawCmd) {
     if (arg.empty()) {
       status.statusMessage = "Error: No filename provided for :e";
     } else if (fileManager.hasUnsavedChanges()) {
-      status.statusMessage =
-          "Error: Unsaved changes! Save first or use :e! filename";
+      status.statusMessage = "Error: Unsaved changes! Save first or use :e! filename";
     } else if (fileManager.loadFile(arg, buffer)) {
       status.statusMessage = "Loaded " + arg;
       undoStack.clear();
       redoStack.clear();
+      setupFileContext();
       updateStatus(22);
     } else {
-      status.statusMessage =
-          "Error: File not found. Created blank file: " + arg;
+      status.statusMessage = "Error: File not found. Created blank file: " + arg;
       buffer.clearBuffer();
       fileManager.saveFile(arg, buffer);
       fileManager.loadFile(arg, buffer);
@@ -714,8 +702,7 @@ void TextEditor::executeCommandMode(const string &rawCmd) {
       if (currentFile.empty()) {
         status.statusMessage = "Error: No active filename to reload";
       } else if (fileManager.loadFile(currentFile, buffer)) {
-        status.statusMessage =
-            "Reloaded " + currentFile + " from disk (changes dropped)";
+        status.statusMessage = "Reloaded " + currentFile + " from disk (changes dropped)";
         undoStack.clear();
         redoStack.clear();
         updateStatus(22);
@@ -730,8 +717,7 @@ void TextEditor::executeCommandMode(const string &rawCmd) {
         setupFileContext();
         updateStatus(22);
       } else {
-        status.statusMessage =
-            "Error: File not found. Switched to new context: " + arg;
+        status.statusMessage = "Error: File not found. Switched to new context: " + arg;
         buffer.clearBuffer();
         fileManager.saveFile(arg, buffer);
         fileManager.loadFile(arg, buffer);
@@ -769,12 +755,9 @@ void TextEditor::executeCommandMode(const string &rawCmd) {
       UndoGroup::beginGroup();
 
       size_t currentLineNum = buffer.getCurrentRowIndex();
-      size_t rowsAvailable = (buffer.getRowCount() >= currentLineNum)
-                                 ? (buffer.getRowCount() - currentLineNum + 1)
-                                 : 0;
-      int actualDeleteCount = (linesToDelete > static_cast<int>(rowsAvailable))
-                                  ? static_cast<int>(rowsAvailable)
-                                  : linesToDelete;
+      size_t rowsAvailable = (buffer.getRowCount() >= currentLineNum) ? (buffer.getRowCount() - currentLineNum + 1) : 0;
+      int actualDeleteCount =
+          (linesToDelete > static_cast<int>(rowsAvailable)) ? static_cast<int>(rowsAvailable) : linesToDelete;
 
       size_t startRowIndex = currentLineNum - 1;
       size_t blockStart = buffer.getRowStartIndex(startRowIndex);
@@ -783,33 +766,27 @@ void TextEditor::executeCommandMode(const string &rawCmd) {
       bool includesPreviousNewline = false;
       for (int i = 0; i < actualDeleteCount; ++i) {
         size_t currRow = startRowIndex + i;
-        if (currRow >= buffer.getRowCount())
-          break;
+        if (currRow >= buffer.getRowCount()) break;
         blockEnd = buffer.getRowEndIndex(currRow);
       }
 
       string deletedBlockText = "";
-      if (startRowIndex + actualDeleteCount >= buffer.getRowCount() &&
-          startRowIndex > 0) {
+      if (startRowIndex + actualDeleteCount >= buffer.getRowCount() && startRowIndex > 0) {
         includesPreviousNewline = true;
         deletedBlockText = buffer.getTextInRange(blockStart - 1, blockEnd);
-      } else if (blockEnd < buffer.getTextLength() &&
-                 buffer.getCharAt(blockEnd) == '\n') {
+      } else if (blockEnd < buffer.getTextLength() && buffer.getCharAt(blockEnd) == '\n') {
         deletedBlockText = buffer.getTextInRange(blockStart, blockEnd + 1);
       } else {
         deletedBlockText = buffer.getTextInRange(blockStart, blockEnd);
       }
 
-      for (int i = 0; i < actualDeleteCount; ++i)
-        deleteRow();
+      for (int i = 0; i < actualDeleteCount; ++i) deleteRow();
       fileManager.markAsModified();
 
       size_t pushPos = includesPreviousNewline ? (blockStart - 1) : blockStart;
-      undoStack.push(
-          UndoAction(EditType::INSERT_CHAR, pushPos, deletedBlockText));
+      undoStack.push(UndoAction(EditType::INSERT_CHAR, pushPos, deletedBlockText));
       redoStack.clear();
-      status.statusMessage =
-          "Deleted " + to_string(actualDeleteCount) + " line(s)";
+      status.statusMessage = "Deleted " + to_string(actualDeleteCount) + " line(s)";
     }
 
     status.currMode = EditorMode::NORMAL;
@@ -838,36 +815,36 @@ void TextEditor::undo() {
   // We replay them in the order they were popped, which reverses the original
   // sequence
 
-  for (UndoAction &action : group) {
+  for (UndoAction& action : group) {
     size_t textLen = action.text.length();
     switch (action.type) {
-    case EditType::DELETE_CHAR:
-      buffer.moveGapTo(action.position);
-      buffer.deleteTextInRange(action.position, action.position + textLen);
-      break;
-    case EditType::ENTER_LN:
-      buffer.moveGapTo(action.position);
-      buffer.deleteTextInRange(action.position, action.position + 1);
-      break;
-    case EditType::INSERT_CHAR:
-      buffer.moveGapTo(action.position);
-      buffer.insertStringAtPos(action.position, action.text);
-      break;
-    case EditType::BACKSPACE_LN:
-      buffer.moveGapTo(action.position);
-      buffer.insertStringAtPos(action.position, action.text);
-      break;
+      case EditType::DELETE_CHAR:
+        buffer.moveGapTo(action.position);
+        buffer.deleteTextInRange(action.position, action.position + textLen);
+        break;
+      case EditType::ENTER_LN:
+        buffer.moveGapTo(action.position);
+        buffer.deleteTextInRange(action.position, action.position + 1);
+        break;
+      case EditType::INSERT_CHAR:
+        buffer.moveGapTo(action.position);
+        buffer.insertStringAtPos(action.position, action.text);
+        break;
+      case EditType::BACKSPACE_LN:
+        buffer.moveGapTo(action.position);
+        buffer.insertStringAtPos(action.position, action.text);
+        break;
     }
   }
 
   // CHANGED: push entire group onto redoStack under a new shared group id
   UndoGroup::beginGroup();
-  for (UndoAction &action : group) {
+  for (UndoAction& action : group) {
     redoStack.push(action);
   }
 
   // Restore cursor to position of the earliest action in the group
-  size_t restorePos = group.back().position; // back() = first pushed = earliest
+  size_t restorePos = group.back().position;  // back() = first pushed = earliest
   buffer.moveGapTo(restorePos);
   status.targetColumn = buffer.getColIndexFromPos(buffer.getCursorPosition());
   updateStatus(22);
@@ -883,35 +860,39 @@ void TextEditor::redo() {
   // CHANGED: pop the entire redo group
   std::vector<UndoAction> group = redoStack.popGroup();
 
-  for (UndoAction &action : group) {
+  for (UndoAction& action : group) {
     size_t textLen = action.text.length();
     switch (action.type) {
-    case EditType::DELETE_CHAR:
-      buffer.moveGapTo(action.position);
-      buffer.insertStringAtPos(action.position, action.text);
-      buffer.moveGapTo(action.position + textLen);
-      break;
-    case EditType::ENTER_LN:
-      buffer.moveGapTo(action.position);
-      buffer.insertStringAtPos(action.position, "\n");
-      buffer.moveGapTo(action.position + 1);
-      break;
-    case EditType::INSERT_CHAR:
-      buffer.moveGapTo(action.position);
-      buffer.deleteTextInRange(action.position, action.position + textLen);
-      buffer.moveGapTo(action.position);
-      break;
-    case EditType::BACKSPACE_LN:
-      buffer.moveGapTo(action.position);
-      buffer.deleteTextInRange(action.position, action.position + 1);
-      buffer.moveGapTo(action.position);
-      break;
+      case EditType::DELETE_CHAR: {
+        buffer.moveGapTo(action.position);
+        buffer.insertStringAtPos(action.position, action.text);
+        buffer.moveGapTo(action.position + textLen);
+        break;
+      }
+      case EditType::ENTER_LN: {
+        buffer.moveGapTo(action.position);
+        buffer.insertStringAtPos(action.position, "\n");
+        buffer.moveGapTo(action.position + 1);
+        break;
+      }
+      case EditType::INSERT_CHAR: {
+        buffer.moveGapTo(action.position);
+        buffer.deleteTextInRange(action.position, action.position + textLen);
+        buffer.moveGapTo(action.position);
+        break;
+      }
+      case EditType::BACKSPACE_LN: {
+        buffer.moveGapTo(action.position);
+        buffer.deleteTextInRange(action.position, action.position + 1);
+        buffer.moveGapTo(action.position);
+        break;
+      }
     }
   }
 
   // CHANGED: push group back onto undoStack under a new shared group id
   UndoGroup::beginGroup();
-  for (UndoAction &action : group) {
+  for (UndoAction& action : group) {
     undoStack.push(action);
   }
 
@@ -928,14 +909,12 @@ void TextEditor::redo() {
 
 void TextEditor::joinCurrentRow() {
   buffer.moveCursorToRowEnd();
-  buffer.deleteTextInRange(buffer.getCursorPosition(),
-                           buffer.getCursorPosition() + 1);
+  buffer.deleteTextInRange(buffer.getCursorPosition(), buffer.getCursorPosition() + 1);
   buffer.insertCharAtCursor(' ');
 }
 
 void TextEditor::deleteRow() {
-  if (buffer.isBufferEmpty())
-    return;
+  if (buffer.isBufferEmpty()) return;
 
   size_t rowIndex = buffer.getCurrentRowIndex() - 1;
   size_t rowStart = buffer.getRowStartIndex(rowIndex);
@@ -968,19 +947,16 @@ void TextEditor::deleteRow() {
 }
 
 void TextEditor::deleteToEndOfRow() {
-  if (buffer.isBufferEmpty())
-    return;
+  if (buffer.isBufferEmpty()) return;
   size_t cursorPos = buffer.getCursorPosition();
   size_t rowEnd = buffer.getRowEndIndex(buffer.getCurrentRowIndex() - 1);
-  if (rowEnd > cursorPos)
-    buffer.deleteTextInRange(cursorPos, rowEnd);
+  if (rowEnd > cursorPos) buffer.deleteTextInRange(cursorPos, rowEnd);
 }
 
 void TextEditor::yankRow() {
   size_t rowIndex = buffer.getCurrentRowIndex() - 1;
   yankBuffer = buffer.getRowText(rowIndex);
-  if (yankBuffer.empty() || yankBuffer.back() != '\n')
-    yankBuffer += '\n';
+  if (yankBuffer.empty() || yankBuffer.back() != '\n') yankBuffer += '\n';
   status.statusMessage = "Yanked line " + to_string(rowIndex + 1);
 }
 
@@ -988,8 +964,7 @@ void TextEditor::yankToEndOfRow() {
   size_t cursorPos = buffer.getCursorPosition();
   size_t rowEnd = buffer.getRowEndIndex(buffer.getCurrentRowIndex() - 1);
   yankBuffer = buffer.getTextInRange(cursorPos, rowEnd);
-  if (yankBuffer.empty() || yankBuffer.back() != '\n')
-    yankBuffer += '\n';
+  if (yankBuffer.empty() || yankBuffer.back() != '\n') yankBuffer += '\n';
   status.statusMessage = "Yanked to end of row";
 }
 
@@ -1001,12 +976,10 @@ void TextEditor::pasteStr(bool after) {
 
   if (after) {
     size_t rowEnd = buffer.getRowEndIndex(buffer.getCurrentRowIndex() - 1);
-    if (rowEnd == buffer.getTextLength())
-      buffer.insertStringAtPos(rowEnd, "\n");
+    if (rowEnd == buffer.getTextLength()) buffer.insertStringAtPos(rowEnd, "\n");
 
     string yanked = yankBuffer;
-    if (!yanked.empty() && yanked.back() == '\n')
-      yanked.pop_back();
+    if (!yanked.empty() && yanked.back() == '\n') yanked.pop_back();
     buffer.insertStringAtPos(rowEnd + 1, yanked);
     buffer.moveGapTo(rowEnd + 1);
   } else {
@@ -1017,8 +990,7 @@ void TextEditor::pasteStr(bool after) {
 }
 
 void TextEditor::indentRow(bool right) {
-  size_t rowFirstIndex =
-      buffer.getRowStartIndex(buffer.getCurrentRowIndex() - 1);
+  size_t rowFirstIndex = buffer.getRowStartIndex(buffer.getCurrentRowIndex() - 1);
   if (right) {
     buffer.insertStringAtPos(rowFirstIndex, "    ");
     buffer.moveCursorToRowEnd();
@@ -1038,9 +1010,7 @@ void TextEditor::updateStatus(size_t terminalTextHeight) {
   scrollWindow(terminalTextHeight);
 }
 
-void TextEditor::updateModifiedStatus() {
-  status.unsavedChanges = fileManager.hasUnsavedChanges();
-}
+void TextEditor::updateModifiedStatus() { status.unsavedChanges = fileManager.hasUnsavedChanges(); }
 
 bool TextEditor::attemptQuit() {
   if (fileManager.hasUnsavedChanges()) {
@@ -1050,6 +1020,38 @@ bool TextEditor::attemptQuit() {
   return true;
 }
 
-void TextEditor::performSearch(const string &pattern, bool forward) {}
-void TextEditor::performReplace(const string &from, const string &to,
-                                bool all) {}
+void TextEditor::performSearch(const string& pattern, bool forward) {
+  size_t statusMsgRow = 0;  // Not strictly used by buffer but required by your signature
+
+  // Call the engine
+  searchEngine.executeSearch(buffer, pattern, forward, statusMsgRow, status.statusMessage);
+
+  // Update cursor position
+  updateStatus(22);
+}
+void TextEditor::performReplace(const string& from, const string& to, bool all) {
+  if (from.empty()) return;
+  size_t rowIdx = buffer.getCurrentRowIndex() - 1;
+  string line = buffer.getRowText(rowIdx);
+  if (line.empty()) return;
+
+  size_t pos = line.find(from);
+  if (pos == string::npos) return;
+
+  UndoGroup::beginGroup();
+  int count = 0;
+  while (pos != string::npos) {
+    size_t startOfRowInBuf = buffer.getRowStartIndex(rowIdx);
+    buffer.deleteTextInRange(startOfRowInBuf + pos, startOfRowInBuf + pos + from.length());
+    buffer.insertStringAtPos(startOfRowInBuf + pos, to);
+
+    count++;
+    if (!all) break;
+
+    // Refresh line and search again
+    line = buffer.getRowText(rowIdx);
+    pos = line.find(from, pos + to.length());
+  }
+  status.statusMessage = "Replaced " + to_string(count) + " occurrences.";
+  fileManager.markAsModified();
+}

@@ -107,7 +107,7 @@ public:
   // return given index value
   char &operator[](size_t);
   // returns gapStart
-  size_t getgapStart();
+  size_t getGapStart();
   // getTextLength() == 0 : nothing typed yet
   bool isBufferEmpty();
   // returns gapStart == gapEnd
@@ -147,21 +147,6 @@ public:
 #endif
 
 // =============================================================================
-
-/*
-gap buffer
-editor
-terminal
-file sys
-cmd parser
-*/
-
-// --- File I/O ---
-
-// editing
-// void deleteWordBeforeCursor(); // ctrl + backspace: delete a word left of
-// cursor void deleteWordAfterCursor(); // ctrl + delete: delete a word right of
-//================================================================
 
 // , HashTable  ,   ,
 // class Terminal {

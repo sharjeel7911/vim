@@ -29,7 +29,9 @@ J - Join current line with next line[]
 2yy - Yank 2 lines[]
 5j - Move down 5 lines[]
 - 5k - Move up 5 lines[]
-- 
+- dwdwqdewqew
+wewewwewe
+weewqwewewed
 
 gg : move to 0:0[] absolute jump also
 G : move to end[]

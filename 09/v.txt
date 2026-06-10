@@ -1,0 +1,90 @@
+ERRORS 
+[RED SYS IS NOT WORKING FOR BLOCKS WE HAVE TO IMPLEMT FOR ALL COMMANDS ]
+
+
+
+NORMAL
+'dd': Delete current line[]
+'D': Delete from cursor to end of line[]
+'x': Delete character under cursor[]
+Backspace: move cursor left[]
+DELETE: del char after cursor []
+
+'0': Move to first character of current line []
+'$': Move to last character of current line[]
+
+'w': Move to start of next word[]
+'b': Move to start of previous word[]
+'e': Move to end of current/next word []
+
+'yy': Yank (copy) current line[]
+Y - yank (copy) to end of line[]
+'p': Paste copied content after current line[]
+'P': Paste copied content before current line[]
+
+J - Join current line with next line[]
+>> - Indent current line[] after doing it it moves cursor to line end my design choice
+<< - Unindent current line[] after doing it it moves cursor to line end my design choice
+3dd - Delete 3 lines[]
+2yy - Yank 2 lines[]
+5j - Move down 5 lines[]
+- 5k - Move up 5 lines[]
+- dwdwqdewqew
+wewewwewe
+weewqwewewed
+
+gg : move to 0:0[] absolute jump also
+G : move to end[]
+
+
+
+INSERT
+Backspace: del char before cursor[]
+DELETE: del char after cursor[]
+
+
+COMMAND
+File Operations
+Core Commands
+:w filename - Save current buffer to file[]
+:q - Quit (with warning if unsaved changes)[]
+:q! - Force quit without saving[]
+:wq - Save and quit[]
+:e filename - Open file for editing[]
+e![]
+:d N - Delete line N []
+- 
+
+u:undo[]
+ctrl+r:redo[] [RED SYS IS NOT WORKING FOR BLOCKS WE HAVE TO IMPLEMT FOR ALL COMMANDS ]
+
+
+
+
+----------------------------------------------------------------
+
+
+4. Display Enhancement
+Last command executed .??????????????????
+
+
+2. Search and Replace
+Commands
+/pattern - Search forward for pattern
+n - Find next occurrence
+N - Find previous occurrence
+:s/old/new - Replace first 'old' with 'new' on current line
+:s/old/new/g - Replace all 'old' with 'new' on current line
+
+
+Command Mode Enhancement
+Features
+Command history using up/down arrows
+Error messages for invalid commands
+Status messages for successful operations
+
+
+
+
+--------
+

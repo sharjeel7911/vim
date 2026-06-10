@@ -319,7 +319,7 @@ bool GapBuffer::isWordChar(char c) {
           c == ']');
 }
 char &GapBuffer::operator[](size_t index) { return buffer[index]; }
-size_t GapBuffer::getgapStart() { return gapStart; }
+size_t GapBuffer::getGapStart() { return gapStart; }
 bool GapBuffer::isBufferEmpty() { return getTextLength() == 0; }
 bool GapBuffer::isGapFilled() { return getGapSize() == 0; }
 size_t GapBuffer::getBufferCapacity() { return bufferSize; }
