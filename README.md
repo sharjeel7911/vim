@@ -306,8 +306,8 @@ Shar/
 │   ├── editor.cpp / editor.h         			 # Core editor state & commands
 │   ├── gapbuffer.cpp / gapbuffer.h   			 # Gap buffer implementation
 │   ├── terminal.cpp / terminal.h     			 # Raw terminal & rendering
-│   ├── searchengine.cpp / searchengine.h       	 # Search & substitution
-│   ├── filemanager.cpp / filemanager.h   	       # File I/O & state
+│   ├── searchengine.cpp / searchengine.h 	 # Search & substitution
+│   ├── filemanager.cpp / filemanager.h   	 # File I/O & state
 │   ├── history.h                     			 # Undo/redo data structures
 │   ├── utilities.h                   		   # ANSI sequences & helpers
 ├── makefile                        		     # Build configuration
