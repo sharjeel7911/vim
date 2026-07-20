@@ -6,9 +6,9 @@ INSTALL_DIR = /usr/local/bin
 
 # Default build rule
 all:
-	$(CXX) $(CXXFLAGS) *.cpp -o $(TARGET)
+	$(CXX) $(CXXFLAGS) src/*.cpp -o $(TARGET)
 
-# The "magic" step for you and your friend
+
 install: all
 	@echo "Installing $(TARGET) globally into $(INSTALL_DIR)..."
 	sudo cp $(TARGET) $(INSTALL_DIR)/$(TARGET)
@@ -16,4 +16,4 @@ install: all
 
 # Clean up build binaries from project folder
 clean:
-	rm -f $(TARGET)
+	rm -f $(TARGET)	

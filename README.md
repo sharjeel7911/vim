@@ -2,7 +2,7 @@
 
 # ⌨️ Shar
 
-A fully functional **Vim-inspired terminal text editor** built in **C++** using **Data Structures** — Final Project for Data Structures Course.
+A fully functional **Vim-inspired terminal text editor** built in **C++** using **Gap Buffer** — Final Project for Data Structures Course.
 
 ![C++](https://img.shields.io/badge/C++-00599C?style=for-the-badge&logo=cplusplus&logoColor=white)
 ![Data Structures](https://img.shields.io/badge/Data%20Structures-Gap%20Buffer-green?style=for-the-badge)
@@ -17,9 +17,9 @@ A fully functional **Vim-inspired terminal text editor** built in **C++** using 
 
 **Shar** is a lightweight, modal text editor running directly in your terminal — inspired by Vim's power and simplicity. Built entirely from scratch using **C++17**, it demonstrates advanced data structures (Gap Buffer), efficient text manipulation, and terminal handling at the systems level.
 
-The editor implements three distinct modes (Normal, Insert, Command), a custom undo/redo system with grouped actions, real-time syntax highlighting, and comprehensive file management — all without external UI libraries.
+The editor implements three distinct modes (Normal, Insert, Command), a custom undo/redo system with grouped actions, and comprehensive file management — all without external UI libraries.
 
-> 📌 This is the **Final Project** for the **Data Structures** course, incorporating a **Binary Search Tree (BST)** as a pedagogical requirement while keeping the core architecture clean and performant.
+> 📌 This is my **Final Project** for the **Data Structures** course.
 
 ---
 
@@ -51,7 +51,7 @@ The editor implements three distinct modes (Normal, Insert, Command), a custom u
 - Auto-detection by file extension (`.cpp`, `.py`, `.js`)
 - Keyword-based coloring for C++, Python, JavaScript
 - Extensible `ColorScheme` class ready for additional languages
-- _Status_: Framework complete, full rendering integration pending
+- _Status_: WORK IN PROGRESS (IN FREE TIME SOON)
 
 ### 💾 **File Management**
 
@@ -257,12 +257,6 @@ Utilities          — ANSI sequences & helper functions
 - Example: `5>>` (5 indent operations) undone as one step
 - Separate stacks for undo and redo
 
-### **Binary Search Tree** ⚠️ _Pedagogical_
-
-- Included in `bst_wrapper.cpp` to satisfy course requirements
-- Intentionally superficial — not integrated into critical paths
-- Keeps main architecture clean while meeting course constraints
-
 ---
 
 ## 🚀 How to Run
@@ -270,21 +264,20 @@ Utilities          — ANSI sequences & helper functions
 ### **Prerequisites**
 
 - C++17 compiler (`g++`, `clang`, or MSVC)
-- Linux/macOS/WSL terminal (Windows native support limited)
+- Linux/macOS/WSL/UNIX terminal (Windows native support limited)
 
 ### **Build & Run**
 
 ```bash
-# Clone or navigate to project directory
+# Clone or navigate to project directory in terminal
 cd shar
 
 # Compile with provided Makefile
 make
 
 # Run the editor
-./shar                    # open blank editor
-./shar filename.txt       # open or create filename.txt
-./shar mycode.cpp         # edit C++ file with syntax highlighting
+./shar                        # open blank editor
+./shar <filename>.<ext>       # open or create filename.txt
 ```
 
 ### **Installation (Optional)**
@@ -294,13 +287,7 @@ make
 make install
 
 # Now use from anywhere
-shar myfile.txt
-```
-
-### **Clean**
-
-```bash
-make clean    # remove compiled binary
+shar <filename>.<ext>
 ```
 
 ---
@@ -312,7 +299,7 @@ make clean    # remove compiled binary
 - ✅ Auto-detection by file extension
 - ✅ Keyword maps for C++, Python, JavaScript
 - ⏳ Full rendering integration pending
-- **Status**: Coloring logic exists but not wired into render loop
+- **Status**: Coloring logic exists but needs working on
 
 ### **Line Wrapping** 🔧 _Partial_
 
@@ -326,23 +313,6 @@ make clean    # remove compiled binary
 - Raw characters flood stdin in Normal Mode
 - **Workaround**: Use Insert Mode for multi-line pastes
 - **Status**: Diagnostic test in progress
-
-### **Search Highlighting** ✅ _Complete_
-
-- Live cyan highlighting of matches
-- Case-insensitive by default
-- Pattern wraps at file boundaries
-
-### **Undo/Redo** ✅ _Complete_
-
-- Multi-action grouping (e.g., `5dd` is one undo)
-- Separate undo and redo stacks
-- Proper cursor restoration
-
-### **File Operations** ✅ _Complete_
-
-- Load, save, save-as, quit with unsaved detection
-- Create new files on demand
 
 ---
 
@@ -378,17 +348,18 @@ If the editor doesn't respond to keys or display is corrupted:
 
 ```
 Shar/
-├── main.cpp               # Entry point
-├── editor.cpp / editor.h  # Core editor state & commands
-├── gapbuffer.cpp / gapbuffer.h          # Gap buffer implementation
-├── terminal.cpp / terminal.h            # Raw terminal & rendering
-├── searchengine.cpp / searchengine.h    # Search & substitution
-├── filemanager.cpp / filemanager.h      # File I/O & state
-├── history.h              # Undo/redo data structures
-├── utilities.h            # ANSI sequences & helpers
-├── bst_wrapper.cpp        # BST requirement (unused)
-├── makefile               # Build configuration
-└── README.md              # This file
+├── src/
+│   ├── main.cpp                      			 # Entry point
+│   ├── editor.cpp / editor.h         			 # Core editor state & commands
+│   ├── gapbuffer.cpp / gapbuffer.h   			 # Gap buffer implementation
+│   ├── terminal.cpp / terminal.h     			 # Raw terminal & rendering
+│   ├── searchengine.cpp / searchengine.h 	 # Search & substitution
+│   ├── filemanager.cpp / filemanager.h   	 # File I/O & state
+│   ├── history.h                     			 # Undo/redo data structures
+│   ├── utilities.h                   		   # ANSI sequences & helpers
+├── makefile                        		     # Build configuration
+├── README.md
+└── LICENSE
 ```
 
 ---
@@ -407,13 +378,12 @@ This project demonstrates:
 
 ## 📄 License
 
-This project is open source and available under the **MIT License**.
+This project is open source and available under the [MIT License](https://github.com/Sharjeel7911/text-editor/blob/main/LICENSE).
 
 ---
 
 <div align="center">
 
-Made with ❤️ and C++17
-_For the Data Structures course_
+Made with ❤️ and C++
 
 </div>
