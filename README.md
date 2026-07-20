@@ -2,7 +2,7 @@
 
 # ⌨️ Shar
 
-A fully functional **Vim-inspired terminal text editor** built in **C++** using **Gap Buffer** — Final Project for Data Structures Course.
+A fully functional **Vim-inspired terminal text editor** built in **C++** using **Gap Buffer**
 
 ![C++](https://img.shields.io/badge/C++-00599C?style=for-the-badge&logo=cplusplus&logoColor=white)
 ![Data Structures](https://img.shields.io/badge/Data%20Structures-Gap%20Buffer-green?style=for-the-badge)
@@ -194,53 +194,6 @@ Commands can be prefixed with counts:
 
 ---
 
-## 🏗️ Architecture
-
-The project is organized across **core data structure and system classes**:
-
-```
-GapBuffer          — Text storage with O(1) cursor insertions
-  ├── moveGapTo()
-  ├── insertCharAtCursor()
-  ├── deleteTextInRange()
-  ├── getRowText()
-  └── [cursor movement methods]
-
-HistoryStack       — Custom undo/redo stack
-  ├── push(UndoAction)
-  ├── popGroup()    — atomic multi-action undo
-  └── [LinkedList-based]
-
-TextEditor         — Main editor state & command logic
-  ├── executeNormalCommand()
-  ├── executeInsertCommand()
-  ├── handleCommandModeInput()
-  └── updateStatus()
-
-Terminal           — Raw terminal mode & rendering
-  ├── enableRawMode()
-  ├── readKey()
-  ├── render(TextEditor)
-  └── getWindowSize()
-
-SearchEngine       — Pattern matching & highlighting
-  ├── executeSearch()
-  ├── findNext() / findPrev()
-  └── executeSubstitution()
-
-FileManager        — Load/save & file state
-  ├── loadFile()
-  ├── saveFile()
-  └── hasUnsavedChanges()
-
-Utilities          — ANSI sequences & helper functions
-  ├── AnsiSeq::clearScreen()
-  ├── AnsiSeq::moveCursor()
-  └── fg256() / bg256() color functions
-```
-
----
-
 ## 📊 Data Structures Used
 
 ### **Gap Buffer** (Core Storage)
@@ -277,7 +230,7 @@ make
 
 # Run the editor
 ./shar                        # open blank editor
-./shar <filename>.<ext>       # open or create filename.txt
+./shar <filename>.<ext>       # open or create any file
 ```
 
 ### **Installation (Optional)**
@@ -353,8 +306,8 @@ Shar/
 │   ├── editor.cpp / editor.h         			 # Core editor state & commands
 │   ├── gapbuffer.cpp / gapbuffer.h   			 # Gap buffer implementation
 │   ├── terminal.cpp / terminal.h     			 # Raw terminal & rendering
-│   ├── searchengine.cpp / searchengine.h 	 # Search & substitution
-│   ├── filemanager.cpp / filemanager.h   	 # File I/O & state
+│   ├── searchengine.cpp / searchengine.h       	 # Search & substitution
+│   ├── filemanager.cpp / filemanager.h   	       # File I/O & state
 │   ├── history.h                     			 # Undo/redo data structures
 │   ├── utilities.h                   		   # ANSI sequences & helpers
 ├── makefile                        		     # Build configuration
