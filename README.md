@@ -94,7 +94,7 @@ The project shifts from "implementing a required data structure" to **"creating 
 | `l`, `→` | Move right                  |
 | `w`      | Jump to next word start     |
 | `b`      | Jump to previous word start |
-| `e`      | Jump to word end            |
+| `e`      | Jump to current word end    |
 | `0`      | Jump to line start          |
 | `$`      | Jump to line end            |
 | `gg`     | Jump to file start          |
@@ -106,15 +106,15 @@ The project shifts from "implementing a required data structure" to **"creating 
 | Command      | Action                                                         |
 | ------------ | -------------------------------------------------------------- |
 | `i`          | Enter Insert Mode                                              |
-| `x`          | Delete character at cursor                                     |
+| `x`          | Delete character under cursor                                  |
 | `d` + motion | Delete text (e.g., `dw` = delete word, `5dd` = delete 5 lines) |
 | `dd`         | Delete entire line                                             |
 | `D`          | Delete to end of line                                          |
 | `y` + motion | Yank (copy) text                                               |
 | `yy`         | Yank entire line                                               |
 | `Y`          | Yank to end of line                                            |
-| `p`          | Paste after cursor                                             |
-| `P`          | Paste before cursor                                            |
+| `p`          | Paste after current line                                       |
+| `P`          | Paste before current line                                      |
 | `J`          | Join current line with next line                               |
 
 #### **Indentation**
@@ -128,11 +128,11 @@ The project shifts from "implementing a required data structure" to **"creating 
 
 #### **Search & Navigation**
 
-| Command    | Action                     |
-| ---------- | -------------------------- |
-| `/pattern` | Search forward for pattern |
-| `n`        | Jump to next match         |
-| `N`        | Jump to previous match     |
+| Command    | Action                 |
+| ---------- | ---------------------- |
+| `/pattern` | Search for a pattern   |
+| `n`        | Jump to next match     |
+| `N`        | Jump to previous match |
 
 #### **Undo/Redo**
 
@@ -159,7 +159,7 @@ Commands can be prefixed with counts:
 | `Esc`              | Exit to Normal Mode            |
 | `Enter`            | Insert newline                 |
 | `Backspace`        | Delete character before cursor |
-| `Delete`           | Delete character at cursor     |
+| `Delete`           | Delete character after cursor  |
 | `Tab`              | Insert 4 spaces (soft tabs)    |
 | `Arrow Keys`       | Navigate while in Insert Mode  |
 | Any printable char | Insert character at cursor     |
@@ -170,15 +170,15 @@ Commands can be prefixed with counts:
 
 #### **File Operations**
 
-| Command        | Action                       |
-| -------------- | ---------------------------- |
-| `:w`           | Save current file            |
-| `:w filename`  | Save as filename             |
-| `:e filename`  | Open/load filename           |
-| `:e! filename` | Force open (discard changes) |
-| `:q`           | Quit (error if unsaved)      |
-| `:q!`          | Force quit (discard changes) |
-| `:wq`          | Save and quit                |
+| Command        | Action                                                 |
+| -------------- | ------------------------------------------------------ |
+| `:w`           | Save current file                                      |
+| `:w filename`  | Save as filename                                       |
+| `:e filename`  | Open/load a file                                       |
+| `:e! filename` | Force open (discard changes of previously opened file) |
+| `:q`           | Quit (error if unsaved)                                |
+| `:q!`          | Force quit (discard changes)                           |
+| `:wq`          | Save and quit                                          |
 
 #### **Text Substitution**
 
