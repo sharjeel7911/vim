@@ -309,7 +309,7 @@ Shar/
 │   ├── searchengine.cpp / searchengine.h    	 # Search & substitution
 │   ├── filemanager.cpp / filemanager.h   	     # File I/O & state
 │   ├── history.h                     			 # Undo/redo data structures
-│   ├── utilities.h                   		      # ANSI sequences & helpers
+│   ├── utilities.h                   		     # ANSI sequences & helpers
 ├── makefile                        		     # Build configuration
 ├── README.md
 └── LICENSE
