@@ -23,6 +23,20 @@ The editor implements three distinct modes (Normal, Insert, Command), a custom u
 
 ---
 
+## 💡 Motivation
+
+When researching text editor implementations, I discovered a critical gap in the C++ open-source ecosystem: **there was no readily available, well-documented Gap Buffer implementation in C++**. Most modern editors (VS Code, Sublime) use Rope or Piece Table data structures, and the few Gap Buffer implementations that exist are either embedded in legacy C projects (like Emacs) or scattered across academic papers without practical, production-ready code.
+
+This motivated me to **implement a from-scratch, performant Gap Buffer in C++17** — not just as an academic exercise, but as a potential open-source contribution. The result is a clean, reusable implementation that:
+
+- ✅ Demonstrates O(1) insertions at cursor with real-world efficiency
+- ✅ Handles dynamic growth and memory reallocation intelligently
+- ✅ Integrates seamlessly with a full modal editor (proving viability)
+- ✅ Could serve as a reference or base for future C++ text editing projects
+  The project shifts from "implementing a required data structure" to **"creating a resource the community can learn from and build upon."**
+
+---
+
 ## 🎯 Core Features
 
 ### ✏️ **Modal Editing**
