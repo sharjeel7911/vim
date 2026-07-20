@@ -257,7 +257,7 @@ shar <filename>.<ext>
 
 ## ⚠️ Known Limitations & In-Progress Features
 
-### **Syntax Highlighting** 🔧 _Framework Complete_
+### **Syntax Highlighting** 🔧 _WORKING UPON_
 
 - ✅ Auto-detection by file extension
 - ✅ Keyword maps for C++, Python, JavaScript
@@ -288,16 +288,6 @@ If the editor doesn't respond to keys or display is corrupted:
 1. Press `Ctrl+C` to force exit
 2. Type `reset` to restore terminal
 3. Verify terminal emulator supports raw mode
-
-### **Cursor Position Bugs** (Fixed)
-
-- Previous issue: `size_t` underflow causing huge scrolls
-- **Solution**: Use `static_cast<int>` and explicit bounds checking in `scrollWindow()`
-
-### **Search Case Sensitivity** (Fixed)
-
-- Previous issue: Highlighting and movement used different matching logic
-- **Solution**: Unified to case-insensitive in both paths
 
 ### **Clangd False Positives**
 
