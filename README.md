@@ -1,6 +1,6 @@
 <div align="center">
 
-# ⌨️ Shar
+# ⌨️ shar
 
 A fully functional **Vim-inspired terminal text editor** built in **C++** using **Gap Buffer**
 
@@ -15,7 +15,7 @@ A fully functional **Vim-inspired terminal text editor** built in **C++** using 
 
 ## 📋 About
 
-**Shar** is a lightweight, modal text editor running directly in your terminal — inspired by Vim's power and simplicity. Built entirely from scratch using **C++17**, it demonstrates advanced data structures (Gap Buffer), efficient text manipulation, and terminal handling at the systems level.
+**`shar`** is a lightweight, modal text editor running directly in your terminal — inspired by Vim's power and simplicity. Built entirely from scratch using **C++17**, it demonstrates advanced data structures (Gap Buffer), efficient text manipulation, and terminal handling at the systems level.
 
 The editor implements three distinct modes (Normal, Insert, Command), a custom undo/redo system with grouped actions, and comprehensive file management — all without external UI libraries.
 
@@ -260,7 +260,7 @@ shar <filename>.<ext>
 ### **Syntax Highlighting** 🔧 _WORKING UPON_
 
 - ✅ Auto-detection by file extension
-- ✅ Keyword maps for C++, Python, JavaScript
+- ✅ Keyword maps for C++, Python, JavaScript, etc.
 - ⏳ Full rendering integration pending
 - **Status**: Coloring logic exists but needs working on
 
@@ -300,7 +300,7 @@ If the editor doesn't respond to keys or display is corrupted:
 ## 📁 Project Structure
 
 ```
-Shar/
+shar/
 ├── src/
 │   ├── main.cpp                      			 # Entry point
 │   ├── editor.cpp / editor.h         			 # Core editor state & commands
@@ -331,7 +331,7 @@ This project demonstrates:
 
 ## 📄 License
 
-This project is open source and available under the [MIT License](https://github.com/Sharjeel7911/text-editor/blob/main/LICENSE).
+This project is open source and available under the [MIT License](https://github.com/sharjeel7911/text-editor/blob/main/LICENSE).
 
 ---
 
