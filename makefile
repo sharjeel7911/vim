@@ -12,7 +12,7 @@ all:
 install: all
 	@echo "Installing $(TARGET) globally into $(INSTALL_DIR)..."
 	sudo cp $(TARGET) $(INSTALL_DIR)/$(TARGET)
-	@echo "Done! You can now use '$(TARGET)' from any folder on your machine."
+	@echo "Done! You can now use '$(TARGET)' editor from any folder on your machine."
 
 # Clean up build binaries from project folder
 clean:

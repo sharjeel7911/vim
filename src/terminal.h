@@ -1,32 +1,35 @@
-#include "utilities.h"
 #include "editor.h"
 #include "gapbuffer.h"
+#include "utilities.h"
 
 struct AppendBuffer {
-  string buff;
-  void append(const string& str) { buff += str; }
-  void append(const char* str, int len) { buff.append(str, len); }
+	string buff;
+	void append(const string& str) { buff += str; }
+	void append(const char* str, int len) { buff.append(str, len); }
 };
 
 #ifndef TERMINAL_H
 #define TERMINAL_H
 class Terminal {
-private:
-  struct termios orig_termios;
-  size_t screenRows;
-  size_t screenCols;
-public:
-  Terminal();
-  ~Terminal();
+ private:
+	struct termios orig_termios;
+	size_t screenRows;
+	size_t screenCols;
 
-  void enableRawMode();
-  void disableRawMode();
-  void getWindowSize();
+ public:
+	Terminal();
+	~Terminal();
 
-  size_t getScreenRows();
-  size_t getScreenCols();
+	void enableRawMode();
+	void disableRawMode();
+	void getWindowSize();
 
-  InputKey readKey();
-  void render(TextEditor&);
+	size_t getScreenRows();
+	size_t getScreenCols();
+
+	static string expandTabsStr(const string& in, int tabStop = 8);
+
+	InputKey readKey();
+	void render(TextEditor&);
 };
 #endif
